@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A story told through a terminal. Created and developed by Uttam Torry.">
+<meta name="color-scheme" content="dark">
+<title>PROJECT C.A.I.N.E.</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Curved glass; the map is drawn by main.js at start-up. -->
+  <filter id="barrel" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feImage id="barrel-map" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+    <feDisplacementMap in="SourceGraphic" in2="map" scale="24" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <!-- Surges: horizontal bands of the picture slide sideways; the map changes every frame. -->
+  <filter id="tear" x="-5%" y="0" width="110%" height="100%" color-interpolation-filters="sRGB">
+    <feImage id="tear-map" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+    <feDisplacementMap id="tear-scale" in="SourceGraphic" in2="map" scale="90" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div id="crt">
+  <!-- The command center: where commands are typed. -->
+  <!-- No whitespace between its parts: the screen keeps spaces as typed, so a line break here would be a blank line on the glass. -->
+  <!-- #return-hint: after a level clear, the way back to the menu, apart from the locked ending text. -->
+  <main id="screen"><div id="log"></div><div id="line"><span id="prompt"></span><span id="typed"></span><span class="cursor" id="cursor">&#9608;</span><span id="typed-after"></span></div><p id="return-hint" class="press" hidden></p></main>
+  <!-- A song found in a folder, playing under the exploring (Owner, 2026-10-01): at the top, beside pause.
+       ♪ Playing: title, the waveform, one button. -->
+  <div id="song-bar" hidden><span class="song-note" aria-hidden="true">♪</span><span id="song-title" aria-live="polite"></span><span id="song-beat" aria-hidden="true"></span><button id="song-prev" class="glyph-btn song-skip" type="button" aria-label="Previous song" hidden></button><button id="song-toggle" class="glyph-btn" type="button"><span class="song-symbol"></span></button><button id="song-next" class="glyph-btn song-skip" type="button" aria-label="Next song" hidden></button></div>
+  <!-- John: the conversation. Full screen during the opening, a floating panel after, with a chat input for questions. -->
+  <aside id="chat" aria-label="Chat">
+    <div id="chat-log"></div>
+    <div id="chat-idle">...</div>
+    <div id="chat-line"><span id="chat-prompt"></span><span id="chat-typed"></span><span class="cursor" id="chat-cursor">&#9608;</span><span id="chat-after"></span></div>
+    <!-- Prepared questions (Owner, 2026-10-01): three for the moment; each is answered from a cluster. -->
+    <div id="prepared" role="group" aria-label="Questions to ask"></div>
+  </aside>
+  <!-- A file, opened like a manual page. -->
+  <section id="pager" aria-label="File">
+    <div id="pager-head"><span id="pager-name-l"></span><span id="pager-name-r"></span></div>
+    <div id="pager-title"></div>
+    <div id="pager-body"></div>
+    <div id="pager-foot"></div>
+  </section>
+  <!-- A picture, full screen, with its caption below. -->
+  <section id="viewer" aria-label="Picture">
+    <div id="viewer-name"></div>
+    <!-- The picture's window: zoomed in, the picture moves inside it and never past its edges. -->
+    <div id="viewer-frame"><img id="viewer-img" alt=""></div>
+    <div id="viewer-caption"></div>
+    <div id="viewer-foot"><span id="viewer-zoom">100%</span>   + and − zoom. Arrows move. Press q to close.</div>
+  </section>
+  <!-- The video overlay (Owner, 2026-10-01): PLAY at the top left; the frozen time and the date at the bottom left. -->
+  <div id="osd-play" class="osd" aria-hidden="true"><span>PLAY</span><span class="osd-glyph"></span></div>
+  <div id="osd-clock" class="osd" aria-label="11:47 PM, September 14, 1993"></div>
+  <!-- The connection timer: small and dim, in the corner. -->
+  <div id="timer" aria-label="Time left"></div>
+  <!-- Danger shown without flashing (Settings > Danger effects: reduced or off; read aloud in every mode). -->
+  <div id="disturbance" role="status" aria-live="polite"></div>
+  <!-- A terminated connection: the virus attack, then the message (red, white and black). -->
+  <div id="virus" hidden></div>
+  <!-- Skip the opening (Owner, 2026-10-01): greyed out until the opening has been watched once. -->
+  <button id="skip-btn" class="glyph-btn" type="button" aria-disabled="true" aria-label="Skip the conversation"><span class="skip-glyph"></span></button>
+  <!-- The fake terminal's death (Owner, 2026-10-01): error screens flash, then, in the dark, the choice. -->
+  <div id="death-choice" hidden role="menu" aria-label="The connection is gone">
+    <button type="button" class="px-btn death-option" data-choice="retry" role="menuitem"><span class="label">TRY AGAIN</span></button>
+    <button type="button" class="px-btn death-option" data-choice="menu" role="menuitem"><span class="label">RETURN TO MAIN MENU</span></button>
+  </div>
+  <!-- Pause (Esc does the same). -->
+  <!-- The game's pause (Owner, 2026-10-01): top left, a labelled control, never like the song's buttons. -->
+  <button id="pause-btn" class="glyph-btn" type="button" aria-label="Pause the game"><span class="pause-glyph"></span></button>
+  <!-- The front end: outside the story, drawn on the same glass. Filled by menu.js. -->
+  <div id="menu" hidden>
+    <header class="menu-head">
+      <h1 id="menu-title" class="menu-title">PROJECT C.A.I.N.E.</h1>
+    </header>
+    <p id="menu-notice" class="menu-notice" role="status" hidden></p>
+    <div id="menu-body"></div>
+  </div>
+  <div id="boot"></div>
+  <!-- A slow roll of static across the glass, always. -->
+  <div id="rollbar"></div>
+  <div id="scanlines"></div>
+  <canvas id="noise" width="160" height="100"></canvas>
+  <canvas id="surge" width="320" height="180"></canvas>
+  <div id="flash"></div>
+  <div id="blackout"></div>
+  <div id="vignette"></div>
+  <!-- The glass of an old CRT (Owner, 2026-10-01): edge glare, a dark fringe, darker corners, a faint reflection. -->
+  <div id="glass"></div>
+</div>
+<dialog id="confirm" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+  <h2 id="confirm-title"></h2>
+  <p id="confirm-text"></p>
+  <div class="confirm-actions">
+    <button id="confirm-cancel" class="menu-item" type="button" data-nav><span class="marker" aria-hidden="true">&gt;</span><span class="label"></span></button>
+    <button id="confirm-ok" class="menu-item" type="button" data-nav><span class="marker" aria-hidden="true">&gt;</span><span class="label"></span></button>
+  </div>
+</dialog>
+<!-- Whole lines for screen readers; the screen itself types letter by letter. -->
+<div id="sr-log" class="sr-only" role="log" aria-live="polite"></div>
+<input id="keys" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type here">
+<script src="level1-data.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>

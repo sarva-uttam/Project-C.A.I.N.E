@@ -1,0 +1,922 @@
+/* Old green phosphor monitor (Owner, 2026-09-30, final): a green screen, not black with green text.
+   No pure black, no pure white. About 125% of a normal terminal at 100% zoom. */
+:root {
+  --deep: #001100;
+  --base: #0a1a0a;
+  --text: #33ff33;
+  --john: #33ff33;
+  --caine: #aaffaa;
+  --typed: #aaffaa;
+  --dim: #00aa00;
+  --red: #ff3333;
+  --edge: #010601;
+  --font: 22px;
+  --glow-rgb: 51, 255, 51;
+  --glow: 0 0 1px currentColor, 0 0 3px rgba(var(--glow-rgb), 0.55), 0 0 14px rgba(var(--glow-rgb), 0.22);
+  --mono: "Lucida Console", "Courier New", Consolas, monospace;
+}
+html, body { margin: 0; height: 100%; background: var(--edge); overflow: hidden; }
+
+/* Monitor frame: curved glass lit green, darkening (never black) at the rim. */
+#crt {
+  position: fixed; inset: 12px; overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(var(--glow-rgb), 0.15) 0%, rgba(var(--glow-rgb), 0.06) 40%, transparent 78%),
+    linear-gradient(var(--base), var(--deep));
+  border-radius: 56px / 46px;
+  box-shadow:
+    inset 0 0 160px 40px rgba(0, 12, 0, 0.9),
+    inset 0 0 24px 6px rgba(0, 8, 0, 0.9),
+    0 0 0 6px #031203, 0 0 0 7px rgba(var(--glow-rgb), 0.12), 0 0 40px 8px rgba(20, 120, 20, 0.2);
+}
+
+#screen, #chat, #pager {
+  position: absolute; box-sizing: border-box;
+  font: var(--font)/1.5 var(--mono);
+  color: var(--text); text-shadow: var(--glow);
+  white-space: pre-wrap; word-break: break-word;
+  filter: url(#barrel);
+}
+#screen { inset: 0; overflow-y: auto; scrollbar-width: none; padding: 56px 68px; }
+#screen::-webkit-scrollbar { display: none; }
+#log > div, #chat-log > div { min-height: 1.5em; }
+
+/* John's panel. */
+#chat { display: flex; flex-direction: column; overflow: hidden; }
+/* The chat scrolls itself to the newest line; its thin scroll bar stays visible. */
+#chat-log { flex: 1 1 auto; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgba(var(--glow-rgb), 0.6) rgba(0, 40, 0, 0.4); }
+#chat-log::-webkit-scrollbar { width: 6px; }
+#chat-log::-webkit-scrollbar-track { background: rgba(0, 40, 0, 0.4); }
+#chat-log::-webkit-scrollbar-thumb { background: rgba(var(--glow-rgb), 0.6); border-radius: 3px; box-shadow: 0 0 6px rgba(var(--glow-rgb), 0.5); }
+#chat-log > div { margin-bottom: 0.4em; }
+.john, .dots { color: var(--john); }
+.caine { color: var(--caine); }
+.choice { color: var(--text); }
+#chat-idle { color: var(--dim); display: none; }
+.denied { color: var(--text); }
+#chat-line { color: var(--typed); display: none; }
+body.choosing #chat-line, body.command #chat-line, body.cursor-on #chat-line { display: block; }
+body.command #chat-line { border-top: 1px solid rgba(var(--glow-rgb), 0.3); padding-top: 0.4em; margin-top: 0.3em; }
+/* Only the focused input shows a cursor. Tab or a click moves between the command center and the chat. */
+body.command:not(.chat-focus) #chat-cursor, body.command.chat-focus #cursor { visibility: hidden; }
+body.command.chat-focus #chat { border-color: rgba(120, 255, 120, 0.95); }
+
+/* Opening: the conversation fills the screen; there is no command center yet. */
+body.opening #screen { display: none; }
+body.opening #chat { inset: 0; padding: 14vh 12vw 10vh; font-size: calc(var(--font) * 1.1); }
+body.opening #chat-log { flex: 0 1 auto; }
+
+/* Command center: the main view, with John floating on the right. */
+body.command #screen { right: 36%; }
+body.command #chat {
+  top: 44px; right: 44px; bottom: 44px; width: 31%; padding: 20px 22px;
+  font-size: calc(var(--font) * 0.86);
+  background: rgba(0, 24, 0, 0.6);
+  /* A deliberate frame, like old terminal software (Owner, 2026-10-01): a thick line, square corners,
+     and a second thin line inside it, the gap between them dark. */
+  border: 3px solid rgba(var(--glow-rgb), 0.95); border-radius: 0;
+  box-shadow: 0 0 0 2px #010801, 0 0 0 3px rgba(var(--glow-rgb), 0.35), 0 0 18px rgba(var(--glow-rgb), 0.3),
+    inset 0 0 0 3px #010801, inset 0 0 0 4px rgba(var(--glow-rgb), 0.6), inset 0 0 22px rgba(var(--glow-rgb), 0.08);
+}
+body.command.idle #chat-idle { display: block; }
+
+.echo, #line { color: var(--typed); }
+.system, .press { color: var(--dim); }
+.file, .ending, .time { color: var(--text); }
+.fake { color: var(--john); }
+.time { margin-top: 32vh; text-align: center; }
+.hidden { visibility: hidden; }
+.cursor { animation: blink 1s steps(1) infinite; }
+.cursor.still { animation: none; }
+@keyframes blink { 50% { opacity: 0; } }
+/* Inside the text the cursor is a block over the letter, which stays readable. */
+.cursor.on-char { background: var(--typed); color: var(--deep); text-shadow: none; animation-name: blink-char; }
+@keyframes blink-char { 50% { background: transparent; color: var(--typed); } }
+
+/* A file opens like a manual page, over the command center. */
+#pager { display: none; flex-direction: column; inset: 0; padding: 56px 68px 48px; }
+body.command #pager { right: 36%; }
+body.file #pager { display: flex; }
+body.file #screen { visibility: hidden; }
+#pager-head { display: flex; justify-content: space-between; }
+#pager-title { margin-top: 1.5em; font-weight: bold; }
+#pager-body { flex: 1; overflow: hidden; margin: 0.5em 0 1em 4ch; white-space: pre-wrap; word-break: break-word; }
+#pager-body.warning { color: var(--red); text-shadow: 0 0 1px currentColor, 0 0 6px rgba(255, 51, 51, 0.45); }
+#pager-foot { background: var(--text); color: var(--deep); text-shadow: none; padding: 0 0.5ch; box-shadow: 0 0 12px rgba(var(--glow-rgb), 0.5); }
+
+/* Phones: John on top, the command center below. */
+@media (max-width: 700px) {
+  :root { --font: 17px; }
+  #crt { inset: 4px; border-radius: 28px / 24px; }
+  #screen, #pager { padding: 26px 20px; }
+  body.opening #chat { padding: 12vh 7vw 8vh; }
+  body.command #screen, body.command #pager { right: 0; top: 38%; }
+  body.command #chat { top: 12px; left: 12px; right: 12px; bottom: auto; height: calc(38% - 20px); width: auto; padding: 12px 14px; }
+  #timer { top: calc(38% - 4px); bottom: auto; }
+  #pager-body { margin-left: 2ch; }
+}
+
+/* Boot: popup windows of scrolling code. */
+#boot { position: absolute; inset: 0; pointer-events: none; display: none; font: calc(var(--font) * 0.62)/1.25 var(--mono); color: var(--text); text-shadow: var(--glow); }
+body.booting #boot { display: block; }
+body.booting #screen, body.booting #chat { visibility: hidden; }
+.pop { position: absolute; overflow: hidden; white-space: pre; padding: 6px 8px; box-sizing: border-box; background: rgba(0, 22, 0, 0.72); }
+.pop.framed { border: 1px solid rgba(var(--glow-rgb), 0.7); box-shadow: 0 0 14px rgba(var(--glow-rgb), 0.3); }
+.pop .bar { display: flex; justify-content: space-between; background: rgba(var(--glow-rgb), 0.75); color: var(--deep); text-shadow: none; margin: -6px -8px 4px; padding: 0 8px; }
+.pop .bar .buttons { letter-spacing: 0.4em; }
+
+/* Overlays: scanlines always, faint noise at the edges, rim shading, surge and flash layers. */
+#scanlines, #noise, #vignette, #surge, #flash { position: absolute; inset: 0; pointer-events: none; }
+#scanlines { background: repeating-linear-gradient(to bottom, rgba(0, 20, 0, 0.28) 0 1px, transparent 1px 3px); }
+#noise {
+  width: 100%; height: 100%; opacity: 0.14; image-rendering: pixelated;
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 58%, #000 100%);
+  mask-image: radial-gradient(ellipse at center, transparent 58%, #000 100%);
+}
+#vignette { background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 10, 0, 0.7) 100%); }
+#surge { width: 100%; height: 100%; opacity: 0; image-rendering: pixelated; }
+#flash { background: #e6ffe6; opacity: 0; }
+
+body.tearing #screen, body.tearing #pager, body.tearing #chat, body.tearing #viewer {
+  filter: url(#tear);
+  text-shadow: -4px 0 rgba(120, 255, 120, 0.8), 5px 0 rgba(235, 255, 235, 0.65), 0 0 12px rgba(var(--glow-rgb), 0.6);
+}
+/* The digital glitch (Owner, 2026-09-30). Chromatic aberration: green and white ghosts 2–5 px apart (Owner, 2026-10-01: green, white, black only). */
+body.aberration #screen, body.aberration #pager, body.aberration #chat, body.aberration #viewer {
+  text-shadow: calc(var(--ab, 0px) * -1) 0 color-mix(in srgb, rgb(var(--glow-rgb)) 55%, white), var(--ab, 0px) 0 color-mix(in srgb, rgb(var(--glow-rgb)) 45%, black), 0 0 6px rgba(var(--glow-rgb), 0.6);
+}
+/* Neon green bloom: green past natural levels. */
+body.bloom #crt > #screen, body.bloom #crt > #chat, body.bloom #crt > #pager { text-shadow: 0 0 2px #b8ffb8, 0 0 10px rgba(var(--glow-rgb), 0.95), 0 0 28px rgba(var(--glow-rgb), 0.7); }
+body.bloom #crt { filter: brightness(var(--bloom, 1.4)) saturate(1.8); }
+/* A one-frame blackout. */
+#blackout { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+body.blackout #blackout { opacity: 1; }
+
+/* The connection timer: small and dim in the corner; brighter in the last minute. */
+#timer { position: absolute; left: 30px; bottom: 16px; font: calc(var(--font) * 0.7) var(--mono); color: var(--dim); opacity: 0.5; display: none; letter-spacing: 0.1em; pointer-events: none; }
+body.command #timer { display: block; }
+
+/* A picture, full screen, with its caption below. Pictures glow in the phosphor's own green. */
+#viewer { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.4vh; padding: 4vh 5vw; box-sizing: border-box; background: rgba(0, 16, 0, 0.94); font: var(--font)/1.4 var(--mono); color: var(--text); text-shadow: var(--glow); z-index: 2; }
+body.viewing #viewer { display: flex; }
+#viewer-frame { flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(var(--glow-rgb), 0.35); }
+#viewer-img { flex: none; transform-origin: center; filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(2.4) brightness(0.95) contrast(1.15); image-rendering: auto; }
+#viewer-caption { white-space: pre-wrap; text-align: center; }
+#viewer-name, #viewer-foot { color: var(--dim); font-size: 0.8em; }
+#viewer-foot { white-space: pre; }
+/* A folder of pictures: thumbnails to pick. */
+.gallery { display: flex; flex-wrap: wrap; gap: 14px; margin: 0.6em 0 0.4em; }
+.thumb { display: flex; flex-direction: column; align-items: center; gap: 0.3em; width: 150px; cursor: var(--cur-hand, pointer); color: var(--dim); font-size: 0.7em; background: none; border: 1px solid rgba(var(--glow-rgb), 0.35); padding: 6px; font-family: var(--mono); text-shadow: var(--glow); }
+.thumb:hover, .thumb:focus { color: var(--text); border-color: var(--text); outline: none; box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.5); }
+.thumb img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(2.4) brightness(0.9); }
+/* The command center opening: a bright scan line drawn left to right across the middle. */
+.sweep { position: absolute; left: 0; top: 50%; height: 2px; width: 0; background: #e6ffe6; box-shadow: 0 0 12px 3px rgba(120, 255, 120, 0.8), 0 0 40px 8px rgba(var(--glow-rgb), 0.4); pointer-events: none; z-index: 5; }
+body.shimmer #screen, body.shimmer #pager, body.shimmer #chat { text-shadow: -1px 0 rgba(120, 255, 120, 0.6), 1px 0 rgba(235, 255, 235, 0.4), 0 0 3px rgba(var(--glow-rgb), 0.55); }
+
+#crt.dark > * { visibility: hidden; }
+
+#keys { position: fixed; left: -1000px; top: 0; width: 1px; height: 1px; opacity: 0; }
+
+/* ---- Settings (front end, 2026-10-01): tokens set by data attributes on <html>. ---------------- */
+
+/* Terminal palettes. Every palette keeps the dark glass and readable contrast; meaning never rests on
+   colour alone (selection has a marker and underline, warnings keep their file names). */
+:root[data-palette="soft-green"] { --text: #8fe08f; --john: #8fe08f; --caine: #cdf2cd; --typed: #cdf2cd; --dim: #62b062; --glow-rgb: 143, 224, 143; --glow: 0 0 1px currentColor, 0 0 6px rgba(var(--glow-rgb), 0.18); }
+:root[data-palette="soft-blue"] { --text: #8cc8ff; --john: #8cc8ff; --caine: #d2e8ff; --typed: #d2e8ff; --dim: #6fa3d6; --base: #0a121a; --deep: #00070f; --edge: #01040a; --glow-rgb: 140, 200, 255; --glow: 0 0 1px currentColor, 0 0 6px rgba(var(--glow-rgb), 0.18); }
+:root[data-palette="soft-amber"] { --text: #ffc266; --john: #ffc266; --caine: #ffe3b3; --typed: #ffe3b3; --dim: #cc9540; --base: #1a130a; --deep: #0f0900; --edge: #080501; --glow-rgb: 255, 194, 102; --glow: 0 0 1px currentColor, 0 0 6px rgba(var(--glow-rgb), 0.18); }
+
+/* Text size. Medium is the Owner's 22 px (17 px on phones). */
+:root[data-text-size="small"] { --font: 18px; }
+:root[data-text-size="large"] { --font: 26px; }
+@media (max-width: 700px) {
+  :root[data-text-size="small"] { --font: 14px; }
+  :root[data-text-size="medium"] { --font: 17px; }
+  :root[data-text-size="large"] { --font: 20px; }
+}
+
+/* Reduce motion: no blinking cursor, no collapsing screen, quieter static. */
+:root[data-reduce-motion="on"] .cursor { animation: none; }
+:root[data-reduce-motion="on"] #noise { opacity: 0.05; }
+:root[data-reduce-motion="on"] #scanlines { opacity: 0.5; }
+
+/* Danger without flashing. The notice is always read aloud; it is drawn when effects are reduced or off.
+   Reduced keeps a still colour fringe on the text; off shows only the notice. */
+#disturbance { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 6; pointer-events: none; font: calc(var(--font) * 0.8)/1.4 var(--mono); color: var(--caine); background: var(--deep); border: 1px solid var(--caine); padding: 0.2em 1ch; white-space: nowrap; }
+:root:not([data-danger-effects="reduced"]):not([data-danger-effects="off"]) #disturbance,
+body:not(.disturbed) #disturbance { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+:root[data-danger-effects="reduced"] body.disturbed #screen, :root[data-danger-effects="reduced"] body.disturbed #chat,
+:root[data-danger-effects="reduced"] body.disturbed #pager, :root[data-danger-effects="reduced"] body.disturbed #viewer {
+  text-shadow: -2px 0 color-mix(in srgb, rgb(var(--glow-rgb)) 55%, white), 2px 0 color-mix(in srgb, rgb(var(--glow-rgb)) 45%, black), 0 0 2px rgba(var(--glow-rgb), 0.5);
+}
+/* Ambient glitches with reduced danger effects: a still fringe, stronger nearer a terminal. No motion. */
+body.still-glitch #screen, body.still-glitch #chat, body.still-glitch #pager, body.still-glitch #viewer {
+  text-shadow: calc(var(--still, 1px) * -1) 0 color-mix(in srgb, rgb(var(--glow-rgb)) 55%, white), var(--still, 1px) 0 color-mix(in srgb, rgb(var(--glow-rgb)) 45%, black), 0 0 2px rgba(var(--glow-rgb), 0.5);
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---- The menu -------------------------------------------------------------------------------- */
+
+body.menu-open #screen, body.menu-open #chat, body.menu-open #pager, body.menu-open #viewer, body.menu-open #timer { display: none; }
+/* Everything centred (Owner, 2026-10-01): the title, the items, the text in each item; the main menu,
+   the pause menu and the settings list sit in the middle of the screen. No prompt, no side space. */
+#menu {
+  position: absolute; inset: 0; z-index: 6; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
+  padding: 5vh 16px 3vh;
+  font: var(--font)/1.5 var(--mono); color: var(--text); text-shadow: var(--glow);
+}
+#menu[hidden] { display: none; }
+#menu[data-screen="main"], #menu[data-screen="pause"], #menu[data-screen="settings"] { justify-content: center; }
+#menu[data-screen="main"] #menu-body, #menu[data-screen="pause"] #menu-body, #menu[data-screen="settings"] #menu-body { flex: 0 1 auto; }
+.menu-head { flex: none; text-align: center; }
+.menu-title { margin: 0 0 0.8em; font-size: calc(var(--font) * 1.8); font-weight: normal; letter-spacing: 0.14em; line-height: 1.2; text-align: center; }
+.menu-notice { flex: none; margin: 0 0 1em; padding: 0.3em 1ch; border-top: 1px solid var(--caine); border-bottom: 1px solid var(--caine); color: var(--caine); white-space: pre-line; max-width: 64ch; text-align: center; }
+.menu-notice.bad { border-color: var(--red); }
+#menu-body { flex: 1 1 auto; min-height: 0; width: min(100%, 76ch); overflow-y: auto; overflow-x: hidden; padding: 0 4px 2em; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(var(--glow-rgb), 0.6) transparent; }
+.menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+
+/* One target per row. Selection is a still pair of markers, an underline and a faint band:
+   no flash, no motion, no glow needed. */
+.menu-item {
+  display: flex; align-items: baseline; justify-content: center; gap: 1ch; box-sizing: border-box; min-height: 44px;
+  margin: 0; padding: 0.2em 1ch; border: 0; border-radius: 0;
+  background: none; color: inherit; font: inherit; text-shadow: inherit; text-align: center; text-decoration: none; cursor: var(--cur-hand, pointer);
+}
+.menu-list .menu-item { min-width: 18ch; }
+.menu-item .marker { visibility: hidden; }
+.menu-list .menu-item::after { content: "<"; visibility: hidden; }
+.menu-item:focus { outline: none; }
+.level-row:focus, .archive-row:focus { background: rgba(var(--glow-rgb), 0.1); }
+.menu-item:focus .marker, .menu-list .menu-item:focus::after { visibility: visible; }
+.menu-item:focus .label { text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 2px; }
+.menu-item:disabled { color: var(--dim); cursor: var(--cur-arrow, default); }
+.menu-item:disabled .label { text-decoration: line-through; }
+.menu-item[aria-disabled="true"] .label { color: var(--dim); }
+
+.screen-head { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 2ch; background: color-mix(in srgb, var(--base) 94%, transparent); padding-bottom: 0.2em; }
+.screen-head h2, .screen-title { margin: 0; font-size: inherit; font-weight: normal; letter-spacing: 0.12em; text-align: center; }
+.screen-title { margin-bottom: 0.6em; }
+.screen-text { margin: 0.4em auto 0.8em; max-width: 64ch; color: var(--caine); text-align: center; }
+.screen-actions { margin-top: 1em; display: flex; justify-content: center; }
+
+/* The pause menu: over the game, which stays visible, dimmed, behind it. */
+body.pause-open #menu { background: rgba(0, 8, 0, 0.88); }
+/* The game's pause: top left, a word and a sign in a thin terminal frame. The song's controls are
+   filled pixel squares at the top right, so the two are never confused (Owner, 2026-10-01). */
+#pause-btn {
+  position: absolute; top: 22px; left: 34px; z-index: 7; display: none; align-items: center; gap: 0.7ch; min-height: 40px; padding: 0 1.2ch;
+  font: bold calc(var(--font) * 0.68) var(--mono); letter-spacing: 0.18em; color: var(--dim); text-shadow: var(--glow);
+  background: rgba(0, 10, 0, 0.55); border: 1px solid rgba(var(--glow-rgb), 0.5); border-left-width: 4px; border-radius: 0;
+}
+#pause-btn .pixel-glyph { width: 0.95em; height: 0.95em; }
+#pause-btn:hover, #pause-btn:focus-visible { outline: none; color: #e6ffe6; border-color: var(--text); box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.45); }
+body.playing:not(.pause-open) #pause-btn { display: flex; }
+
+/* Levels: ten to a page. */
+.pager { display: grid; grid-template-columns: max-content max-content max-content; grid-template-areas: "prev label next"; justify-content: center; align-items: center; gap: 0 2ch; }
+.pager [data-id="prev"] { grid-area: prev; }
+.pager [data-id="next"] { grid-area: next; }
+.pager .menu-item { width: auto; }
+.page-label { grid-area: label; margin: 0; color: var(--dim); }
+.level-list { list-style: none; margin: 0.3em 0; padding: 0; }
+.level-row { width: 100%; justify-content: space-between; text-align: left; }
+.level-row .label { flex: 1 1 auto; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.level-status { flex: none; font-size: 0.8em; color: var(--dim); }
+.status-available .level-status, .status-completed .level-status { color: var(--text); }
+.level-detail { margin-top: 0.4em; padding-top: 0.5em; border-top: 1px solid rgba(var(--glow-rgb), 0.35); white-space: pre-wrap; max-width: 70ch; min-height: 6em; color: var(--caine); }
+
+/* Wide screens: the detail sits beside the list, so records stay in view. */
+@media (min-width: 1100px) {
+  .levels-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 0 3ch; align-items: start; }
+  .level-detail { position: sticky; top: 3.2em; margin-top: 0.3em; padding: 0 0 0 2ch; border-top: 0; border-left: 1px solid rgba(var(--glow-rgb), 0.35); }
+}
+
+/* Settings: each value is a button; the chosen one is bracketed and underlined. */
+.setting { margin: 0.7em 0 0.9em; text-align: center; }
+.setting-label { display: block; color: var(--dim); letter-spacing: 0.08em; }
+.options { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.1em 1.5ch; }
+.option { min-height: 44px; padding: 0.1em 0.4ch; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; text-shadow: inherit; cursor: var(--cur-hand, pointer); }
+.option::before { content: "\00a0"; }
+.option::after { content: "\00a0"; }
+.option[aria-pressed="true"]::before { content: "["; }
+.option[aria-pressed="true"]::after { content: "]"; }
+.option[aria-pressed="true"] { border-bottom-color: currentColor; }
+.option:focus { outline: 2px solid currentColor; outline-offset: 2px; }
+.setting-help { margin: 0.15em auto 0; max-width: 64ch; font-size: 0.8em; color: var(--dim); }
+
+/* Controls, about, privacy. */
+#menu-body section { margin: 0.6em 0 1em; }
+#menu-body h3 { margin: 0 0 0.3em; font-size: inherit; font-weight: normal; color: var(--dim); letter-spacing: 0.1em; text-align: center; }
+.keys { display: grid; grid-template-columns: 22ch minmax(0, 1fr); gap: 0.25em 2ch; margin: 0 auto; max-width: 70ch; }
+.keys dt { color: var(--text); }
+.keys dd { margin: 0; color: var(--caine); }
+.about p, .privacy p { margin: 0 auto 0.8em; max-width: 64ch; color: var(--caine); }
+.about { text-align: center; }
+.about .about-title { color: var(--text); letter-spacing: 0.14em; }
+.menu-link .external { color: var(--dim); font-size: 0.8em; }
+
+/* The confirmation: a native modal dialog over the glass. */
+#confirm {
+  box-sizing: border-box; max-width: min(40em, calc(100vw - 32px)); padding: 1.2em 1.6em;
+  background: var(--deep); color: var(--text); border: 1px solid var(--text);
+  font: var(--font)/1.5 var(--mono); text-shadow: var(--glow); box-shadow: 0 0 30px rgba(var(--glow-rgb), 0.25);
+}
+#confirm::backdrop { background: rgba(0, 6, 0, 0.78); }
+#confirm h2 { margin: 0 0 0.6em; font-size: inherit; font-weight: normal; letter-spacing: 0.08em; }
+#confirm p { margin: 0; color: var(--caine); }
+.confirm-actions { display: flex; flex-direction: column; gap: 0.2em; margin-top: 1.2em; }
+
+@media (max-width: 700px) {
+  #menu { padding: 22px 16px 12px; }
+  #pause-btn { top: 6px; right: 8px; }
+  .virus-message { padding: 1em 1.2em; }
+  .menu-title { font-size: calc(var(--font) * 1.5); }
+  .keys { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .pager { grid-template-columns: max-content max-content; grid-template-areas: "label label" "prev next"; }
+  .keys dd { margin-bottom: 0.5em; }
+}
+#return-hint { margin: 1.5em 0 0; }
+
+/* Screen curvature off (Settings > Display): the text is drawn flat. Glitches still tear it. */
+:root[data-curvature="off"] body:not(.tearing) #screen, :root[data-curvature="off"] body:not(.tearing) #chat, :root[data-curvature="off"] body:not(.tearing) #pager { filter: none; }
+
+/* ---- Connection terminated (Owner, 2026-10-01): the virus attack. Red, white and black. ---------- */
+#virus { position: absolute; inset: 0; z-index: 8; overflow: hidden; pointer-events: none; }
+#virus[hidden] { display: none; }
+.virus-box { position: absolute; box-sizing: border-box; border: 2px solid; overflow: hidden; }
+.virus-box canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.virus-box.tone-0 { background: #000; border-color: #fff; }
+.virus-box.tone-1 { background: #fff; border-color: #e00000; }
+.virus-box.tone-2 { background: #e00000; border-color: #000; }
+.virus-message {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  padding: 1.2em 2.4em; background: #000; color: #fff; border: 3px solid #e00000; text-shadow: none;
+  font: calc(var(--font) * 1.05)/1.5 var(--mono); text-align: center; white-space: pre;
+  box-shadow: 0 0 0 4px #000, 0 0 40px rgba(255, 0, 0, 0.45);
+}
+.virus-message div { min-height: 1.5em; }
+.virus-message .headline { font-weight: bold; letter-spacing: 0.12em; }
+.virus-message .failed { color: #ff3030; font-weight: bold; letter-spacing: 0.06em; }
+/* Death (Owner, 2026-10-06): the frozen command center and chat stay visible, as they were, under the error animation. */
+body.playing.terminated:not(.pause-open) #pause-btn { display: none; }
+
+/* An old TV switching off: the glass collapses (animated from main.js); a four-pointed star; darkness. */
+#crt.blank { background: #000; box-shadow: none; }
+#crt.blank > * { visibility: hidden; }
+.tv-star { position: fixed; left: 50%; top: 50%; width: 110px; height: 110px; z-index: 20; pointer-events: none;
+  background: radial-gradient(circle, #fff 0 3px, rgba(230, 255, 230, 0.85) 5px, transparent 14px); }
+.tv-star::before, .tv-star::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 110px; height: 3px; transform: translate(-50%, -50%);
+  background: linear-gradient(to right, transparent, #fff 42%, #fff 58%, transparent); border-radius: 2px;
+  box-shadow: 0 0 8px rgba(220, 255, 220, 0.9);
+}
+.tv-star::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+/* ---- Pixel cursors (Owner, 2026-10-01): drawn by cursor.js in the palette's green. ------------------ */
+html, body, body * { cursor: var(--cur-arrow, default); }
+button, a, .option, .thumb, .song-file, #song-toggle, #pause-btn, #skip-btn, .prepared-q, .menu-item, button *, a * { cursor: var(--cur-hand, pointer); }
+.menu-item:disabled, .menu-item:disabled * { cursor: var(--cur-arrow, default); }
+/* Where the player types. */
+body.command:not(.pause-open) #screen, body.command:not(.pause-open) #chat, body.choosing #chat { cursor: var(--cur-text, text); }
+body.command:not(.pause-open) #screen button, body.command:not(.pause-open) #screen button *, body.command:not(.pause-open) #chat button { cursor: var(--cur-hand, pointer); }
+/* Busy: the boot, a terminated connection, the screen switching off. */
+body.booting, body.booting *, body.terminated, body.terminated *, body:has(#crt.tv-off), body:has(#crt.tv-off) * { cursor: var(--cur-wait, wait); }
+
+/* ---- The title (Owner, 2026-10-01): on the main menu it dominates, bright, glowing, unsteady. ---- */
+.title-project, .title-caine { display: inline; }
+.title-project::after { content: " "; }
+#menu[data-screen="main"] { justify-content: flex-start; padding-top: 5vh; }
+/* The main menu fits the glass: no scroll bar (Owner, 2026-10-01). */
+#menu[data-screen="main"] #menu-body { scrollbar-width: none; }
+#menu[data-screen="main"] #menu-body::-webkit-scrollbar { display: none; }
+#menu[data-screen="main"] .menu-title {
+  margin: 0 0 5vh; line-height: 1; letter-spacing: 0; color: var(--text);
+  text-shadow: 0 0 2px #e6ffe6, 0 0 8px rgba(var(--glow-rgb), 1), 0 0 24px rgba(var(--glow-rgb), 0.85), 0 0 60px rgba(var(--glow-rgb), 0.55), 0 0 110px rgba(var(--glow-rgb), 0.3);
+  animation: title-unsteady 7.3s infinite;
+}
+#menu[data-screen="main"] .title-project { display: block; font-size: min(calc(var(--font) * 2.6), 6vw, 7vh); letter-spacing: 0.55em; margin: 0 0 0.25em 0.55em; }
+#menu[data-screen="main"] .title-project::after { content: none; }
+/* Centred exactly: the trailing letter space is given back on the left. */
+#menu[data-screen="main"] .title-caine { display: block; font-size: min(calc(var(--font) * 7.4), 13.5vw, 20vh); letter-spacing: 0.06em; margin-left: 0.06em; }
+/* A slight, irregular dip in the glow, never a flash; still under reduce motion. */
+@keyframes title-unsteady {
+  0%, 38%, 41%, 72%, 74.5%, 77%, 100% { opacity: 1; filter: brightness(1); }
+  39.5% { opacity: 0.86; filter: brightness(0.92); }
+  73% { opacity: 0.9; filter: brightness(1.08); }
+  75.5% { opacity: 0.84; filter: brightness(0.9); }
+}
+:root[data-reduce-motion="on"] #menu .menu-title { animation: none; }
+/* On hover it splits, like a signal being watched back. */
+#menu[data-screen="main"] .menu-title:hover {
+  text-shadow: -4px 0 color-mix(in srgb, rgb(var(--glow-rgb)) 55%, white), 4px 0 color-mix(in srgb, rgb(var(--glow-rgb)) 40%, black), 0 0 8px rgba(var(--glow-rgb), 1), 0 0 40px rgba(var(--glow-rgb), 0.7);
+}
+
+/* ---- Songs (Owner, 2026-10-01; redesigned the same day) --------------------------------------------- */
+/* A song in a folder is one line, the same height as any file: "♪ NAME.MP3  ▶" in the phosphor's green. */
+.song-file {
+  display: inline; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; line-height: inherit; color: var(--text); text-shadow: var(--glow); white-space: pre;
+}
+.song-file .song-symbol { display: inline-block; margin-left: 2ch; vertical-align: -0.08em; }
+.song-file .pixel-glyph { width: 0.8em; height: 0.8em; filter: drop-shadow(0 0 3px rgba(var(--glow-rgb), 0.7)); }
+.song-file:hover, .song-file:focus-visible { outline: none; color: #d8ffd8; text-shadow: 0 0 2px #b8ffb8, 0 0 8px rgba(var(--glow-rgb), 0.9); }
+.song-file.playing { color: #d8ffd8; text-shadow: 0 0 2px #b8ffb8, 0 0 10px rgba(var(--glow-rgb), 0.85); }
+/* The bar at the top of the screen, beside pause (Owner, 2026-10-01): ♪  Playing: title   waveform   one button. */
+#song-bar {
+  position: absolute; top: 22px; right: 90px; z-index: 7; box-sizing: border-box; height: 44px; max-width: min(64%, 900px);
+  display: flex; align-items: center; gap: 1.2ch; padding: 0 0.6ch 0 1.2ch;
+  font: calc(var(--font) * 0.8)/1.5 var(--mono); color: var(--caine); text-shadow: var(--glow);
+  background: rgba(0, 18, 0, 0.92); border: 2px solid rgba(var(--glow-rgb), 0.7); box-shadow: 0 0 0 2px #010801, 0 0 14px rgba(var(--glow-rgb), 0.25);
+}
+#song-bar[hidden], body:not(.command) #song-bar, body.file #song-bar, body.viewing #song-bar, body.menu-open #song-bar, body.pause-open #song-bar { display: none; }
+/* Room for it: the command center's first line and John's panel start below it. */
+body.song-on.command #screen { padding-top: 92px; }
+body.song-on.command #chat { top: 84px; }
+.song-note { color: var(--text); }
+#song-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The waveform: about 4 cm of bars that bounce out from a centre line. */
+#song-beat { flex: none; display: inline-flex; align-items: center; gap: 2px; height: 30px; margin-left: 1ch; }
+#song-beat i { display: block; width: 4px; height: 100%; background: var(--text); box-shadow: 0 0 4px rgba(var(--glow-rgb), 0.7); transform: scaleY(0.12); transform-origin: center; }
+#song-toggle { flex: none; }
+@media (max-width: 700px) {
+  #song-bar { top: 6px; right: 60px; left: 8px; max-width: none; }
+  #song-beat i { width: 3px; }
+  #song-beat i:nth-child(n + 15) { display: none; }
+}
+
+/* ---- The Archive (Owner, 2026-10-01): two columns, like CONTROLS. ----------------------------------- */
+/* Two panels (Owner, 2026-10-01): the levels on the left, the opened level's contents on the right. */
+#menu[data-screen="archive"] #menu-body { width: min(100%, 140ch); }
+.archive-head { position: relative; justify-content: center; border-top: 2px solid rgba(var(--glow-rgb), 0.6); margin-top: 0.2em; padding-top: 0.3em; }
+.archive-head .menu-back { position: absolute; left: 0; top: 0.3em; }
+.archive-panels { display: grid; grid-template-columns: minmax(0, 30ch) minmax(0, 1fr); gap: 0 3ch; align-items: start; margin-top: 0.8em; }
+.archive-left { border-right: 2px solid rgba(var(--glow-rgb), 0.35); padding-right: 2ch; }
+.archive-pager { display: flex; align-items: center; justify-content: space-between; gap: 1ch; margin-bottom: 0.6em; }
+.archive-pager .px-square:disabled { filter: saturate(0.2) brightness(0.5); cursor: var(--cur-arrow, default); }
+.archive-page-label { letter-spacing: 0.08em; white-space: nowrap; }
+.archive-levels { list-style: none; margin: 0; padding: 0; }
+.archive-level {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%; min-height: 44px; margin: 0.15em 0; padding: 0.25em 1ch;
+  border: 2px solid transparent; background: none; font: inherit; text-align: left; color: var(--text); text-shadow: var(--glow);
+}
+.archive-level-name { position: relative; display: inline-flex; align-items: center; gap: 1ch; padding-right: 1.2ch; }
+.archive-level-name .pixel-icon { width: 1.6em; height: 1.3em; }
+.archive-level-state { display: inline-flex; align-items: center; gap: 0.6ch; margin-left: calc(1.6em + 1ch); font-size: 0.62em; letter-spacing: 0.12em; }
+.archive-level-state .pixel-glyph { width: 0.95em; height: 0.95em; }
+/* Unlocked: bright and clickable. Locked: dim, not clickable. */
+.archive-level.is-unlocked { color: #d8ffd8; text-shadow: 0 0 2px #b8ffb8, 0 0 8px rgba(var(--glow-rgb), 0.8); }
+.archive-level.is-locked { color: var(--dim); text-shadow: none; opacity: 0.55; cursor: var(--cur-arrow, default); }
+.archive-level.is-unlocked:hover, .archive-level.is-unlocked:focus, .archive-level.is-open { outline: none; border-color: rgba(var(--glow-rgb), 0.8); background: rgba(var(--glow-rgb), 0.12); }
+.archive-level.is-locked:focus { outline: 1px dotted var(--dim); }
+/* New discoveries: a bright dot at the top right of the level's name. */
+.new-dot { position: absolute; right: 0; top: 0.05em; width: 0.5em; height: 0.5em; border-radius: 50%; background: #e6ffe6; box-shadow: 0 0 4px #b8ffb8, 0 0 10px rgba(var(--glow-rgb), 1); }
+.archive-right { min-height: 12em; }
+.archive-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.6em 2ch; margin-bottom: 0.8em; }
+.archive-tabs, .archive-toggle { display: flex; gap: 0.6ch; }
+
+.archive-tab .marker { display: none; }
+.archive-list { list-style: none; margin: 0; padding: 0; }
+.archive-row { display: flex; align-items: center; justify-content: space-between; gap: 2ch; padding: 0.15em 0; border-bottom: 1px solid rgba(var(--glow-rgb), 0.18); }
+.archive-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archive-action { min-width: 9ch; }
+.archive-action .marker { display: none; }
+.archive-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1em 1.5ch; }
+.archive-tile, .archive-thumb {
+  display: flex; flex-direction: column; align-items: center; gap: 0.4em; width: 100%; padding: 8px; box-sizing: border-box;
+  border: 2px solid rgba(var(--glow-rgb), 0.35); background: rgba(0, 20, 0, 0.5); color: var(--text); font: calc(var(--font) * 0.7)/1.3 var(--mono); text-shadow: var(--glow);
+}
+.archive-tile .pixel-icon { width: 64px; height: 52px; }
+.archive-thumb img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(2.4) brightness(0.9); }
+.archive-thumb:hover, .archive-thumb:focus, button.archive-tile:hover, button.archive-tile:focus { outline: none; border-color: var(--text); box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.5); }
+.archive-tile .archive-name, .archive-thumb .archive-name { max-width: 100%; }
+.archive-view { max-width: 72ch; margin: 0.6em auto; text-align: center; }
+.archive-image { max-width: 100%; max-height: 52vh; filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(2.4) brightness(0.95) contrast(1.15); box-shadow: 0 0 24px rgba(var(--glow-rgb), 0.35); }
+.archive-caption { color: var(--caine); white-space: pre-wrap; }
+.archive-text { margin: 0; padding: 0.8em 1.2ch; text-align: left; white-space: pre-wrap; word-break: break-word; font: inherit; color: var(--text); border: 1px solid rgba(var(--glow-rgb), 0.35); background: rgba(0, 16, 0, 0.5); }
+.archive-text.warning { color: var(--red); }
+/* The now-playing bar in the Archive: top right, over the menu, with ⏮ and ⏭. */
+.archive-right > #song-bar:not([hidden]) { display: flex; position: static; max-width: none; margin: 0 0 0.9em; z-index: auto; }
+#song-bar .song-skip[hidden] { display: none; }
+@media (max-width: 700px) {
+  .archive-panels { grid-template-columns: minmax(0, 1fr); }
+  .archive-left { border-right: 0; padding-right: 0; border-bottom: 2px solid rgba(var(--glow-rgb), 0.35); padding-bottom: 0.6em; margin-bottom: 0.8em; }
+  .archive-head .menu-back { position: static; }
+}
+
+/* ---- A slow roll of static, always (Owner, 2026-10-01): one faint band, bottom to top, every 4 s. --- */
+#rollbar {
+  position: absolute; left: 0; right: 0; top: 100%; height: 9%; z-index: 9; pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(220, 255, 220, 0.045) 0 1px, transparent 1px 3px, rgba(220, 255, 220, 0.03) 3px 4px, transparent 4px 7px),
+    linear-gradient(to bottom, transparent, rgba(var(--glow-rgb), 0.05) 40%, rgba(220, 255, 220, 0.085) 50%, rgba(var(--glow-rgb), 0.05) 60%, transparent);
+  animation: roll 4s linear infinite;
+}
+@keyframes roll { from { top: 100%; } to { top: -9%; } }
+:root[data-reduce-motion="on"] #rollbar { display: none; }
+
+/* The boot's rest: the empty glass, before "Wake up Caine." */
+#crt.boot-rest > #screen, #crt.boot-rest > #chat { visibility: hidden; }
+
+/* ---- [MORE] under a long listing (Owner, 2026-10-01): any key or tap shows the next page. ---------- */
+.more { color: var(--deep); background: var(--text); text-shadow: none; display: inline-block; min-height: 0; padding: 0 0.5ch; box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.5); }
+#log > .more { min-height: 0; }
+
+/* ---- Prepared questions (Owner, 2026-10-01): under John's chat line, small, one tap each. ---------- */
+#prepared { display: none; flex-wrap: wrap; gap: 0.35em 0.8ch; margin-top: 0.5em; }
+body.command #prepared:not(:empty), body.choosing #prepared:not(:empty) { display: flex; }
+.prepared-q {
+  min-height: 32px; padding: 0.1em 0.8ch; border: 1px solid rgba(var(--glow-rgb), 0.4); border-radius: 4px; background: rgba(0, 30, 0, 0.5);
+  color: var(--caine); font: calc(var(--font) * 0.72)/1.3 var(--mono); text-shadow: var(--glow); text-align: left; white-space: normal;
+}
+.prepared-q:hover, .prepared-q:focus-visible { outline: none; color: var(--text); border-color: var(--text); box-shadow: 0 0 8px rgba(var(--glow-rgb), 0.45); }
+#prepared.waiting .prepared-q { opacity: 0.45; }
+/* They fade while the player types or John answers, and come back after (Owner, 2026-10-03). */
+#prepared { transition: opacity 0.35s ease; }
+#prepared.faded { opacity: 0; pointer-events: none; }
+/* A command inside John's line (Level 1 flow): brighter, like typed text. */
+#chat-log .cmd { color: var(--text); font-weight: bold; }
+/* Level clear (Owner, 2026-10-03): "The screen fades." */
+body.fading #screen, body.fading #chat, body.fading #timer, body.fading .osd { opacity: 0; transition: opacity 2.2s ease; }
+
+/* ---- SKIP (Owner, 2026-10-01): top right, beside pause, during the opening only. -------------------- */
+#skip-btn { position: absolute; top: 22px; right: 90px; z-index: 7; display: none; gap: 0.8ch; letter-spacing: 0.15em; }
+body.playing.skippable:not(.pause-open) #skip-btn { display: flex; }
+/* The first time through: greyed out, not clickable, with a tooltip. */
+#skip-btn.locked { filter: saturate(0.2) brightness(0.65); cursor: var(--cur-arrow, default); }
+#skip-btn.locked::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 6px); right: 0; padding: 0.2em 1ch; white-space: nowrap;
+  font-weight: normal; letter-spacing: 0; color: var(--caine); background: var(--deep); border: 1px solid rgba(var(--glow-rgb), 0.5);
+  opacity: 0; visibility: hidden; transition: opacity 0.15s;
+}
+#skip-btn.locked:hover::after, #skip-btn.locked:focus-visible::after { opacity: 1; visibility: visible; }
+@media (max-width: 700px) {
+  #skip-btn { top: 6px; right: 60px; }
+}
+
+/* ---- Pixel buttons (Owner, 2026-10-01: the retro pixel-art button sheet, in phosphor green) ---------
+   A notched dark edge, a light inner line, a face with a rivet in each corner, and an inner panel
+   with its own light outline. Drawn with background layers only (no clip-path), so a tooltip can sit
+   outside. Used for every button: pause, SKIP, the song's play/pause, the menus, the settings, the
+   confirmations, the page arrows and John's prepared questions. */
+.px-btn, .prepared-q {
+  --n: 2px;
+  --pd: color-mix(in srgb, rgb(var(--glow-rgb)) 22%, #000);
+  --pl: color-mix(in srgb, rgb(var(--glow-rgb)) 72%, #021002);
+  --pf: color-mix(in srgb, rgb(var(--glow-rgb)) 20%, #021002);
+  --pi: color-mix(in srgb, rgb(var(--glow-rgb)) 32%, #021002);
+  box-sizing: border-box; border: 0; border-radius: 0; color: #e6ffe6;
+  text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.9), 0 0 6px rgba(var(--glow-rgb), 0.35);
+  padding: calc(var(--n) * 4 + 0.15em) calc(var(--n) * 4 + 1ch);
+  background:
+    linear-gradient(var(--pl), var(--pl)) left calc(var(--n) * 2) top calc(var(--n) * 2) / var(--n) var(--n) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) right calc(var(--n) * 2) top calc(var(--n) * 2) / var(--n) var(--n) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) left calc(var(--n) * 2) bottom calc(var(--n) * 2) / var(--n) var(--n) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) right calc(var(--n) * 2) bottom calc(var(--n) * 2) / var(--n) var(--n) no-repeat,
+    linear-gradient(var(--pi), var(--pi)) calc(var(--n) * 4) calc(var(--n) * 4) / calc(100% - var(--n) * 8) calc(100% - var(--n) * 8) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) calc(var(--n) * 3) calc(var(--n) * 3) / calc(100% - var(--n) * 6) calc(100% - var(--n) * 6) no-repeat,
+    linear-gradient(var(--pf), var(--pf)) calc(var(--n) * 2) calc(var(--n) * 2) / calc(100% - var(--n) * 4) calc(100% - var(--n) * 4) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) calc(var(--n) * 2) var(--n) / calc(100% - var(--n) * 4) calc(100% - var(--n) * 2) no-repeat,
+    linear-gradient(var(--pl), var(--pl)) var(--n) calc(var(--n) * 2) / calc(100% - var(--n) * 2) calc(100% - var(--n) * 4) no-repeat,
+    linear-gradient(var(--pd), var(--pd)) var(--n) 0 / calc(100% - var(--n) * 2) 100% no-repeat,
+    linear-gradient(var(--pd), var(--pd)) 0 var(--n) / 100% calc(100% - var(--n) * 2) no-repeat;
+}
+.px-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; font: bold calc(var(--font) * 0.7) var(--mono); }
+.px-square { width: 44px; height: 44px; padding: 0; }
+/* Hover and focus: the panel lights up; selection keeps its markers and underline as well. */
+.px-btn:hover, .px-btn:focus-visible, .prepared-q:hover, .prepared-q:focus-visible {
+  --pi: color-mix(in srgb, rgb(var(--glow-rgb)) 52%, #021002);
+  --pl: color-mix(in srgb, rgb(var(--glow-rgb)) 90%, #fff);
+  outline: none; color: #fff;
+}
+
+.prepared-q { --n: 2px; padding: calc(var(--n) * 4 + 0.05em) calc(var(--n) * 4 + 0.6ch); border: 0; }
+.pixel-glyph { width: 18px; height: 18px; display: block; color: inherit; filter: drop-shadow(0 0 2px rgba(var(--glow-rgb), 0.8)); }
+
+/* ---- Icon view of dir (Owner, 2026-10-01; Settings > Display > View mode) -------------------------- */
+/* --icon-scale (Owner, 2026-10-06): set by the game so a whole folder fits the glass; below the smallest
+   size the icons scroll inside the grid's own box (.scrolls), with a thin bar. */
+.icon-grid { --icon-scale: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(156px * var(--icon-scale)), 1fr)); gap: calc(0.6em * var(--icon-scale)) 1ch; margin: 0.4em 0 0.6em; white-space: normal; }
+.icon-grid.scrolls { overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; scrollbar-color: rgba(var(--glow-rgb), 0.6) rgba(0, 40, 0, 0.4); }
+.icon-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 0.35em; padding: calc(8px * var(--icon-scale)) 4px; min-height: 44px;
+  border: 2px solid transparent; background: none; color: var(--text); text-shadow: var(--glow); font: calc(var(--font) * 0.62 * max(var(--icon-scale), 0.8))/1.25 var(--mono);
+}
+.icon-tile .pixel-icon { width: calc(80px * var(--icon-scale)); height: calc(64px * var(--icon-scale)); filter: drop-shadow(0 0 4px rgba(var(--glow-rgb), 0.55)); }
+/* A picture's tile shows the picture, in the phosphor's green like the thumbnails. */
+.icon-tile .icon-thumb { object-fit: cover; border: 1px solid rgba(var(--glow-rgb), 0.45); box-sizing: border-box; filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(2.4) brightness(0.9); }
+.icon-name { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.icon-tile:hover, .icon-tile:focus-visible { outline: none; border-color: rgba(var(--glow-rgb), 0.7); background: rgba(var(--glow-rgb), 0.1); }
+.icon-tile.kind-song .icon-name { color: #d8ffd8; }
+
+/* ---- The CRT in a dark room (Owner, 2026-10-01) ----------------------------------------------------
+   No desk, no casing, no bezel: a void, and in it the glass, bowing outward at every edge. */
+html, body { background: #010201; }
+#crt {
+  inset: 3.2vh 2.6vw;
+  border-radius: 0;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M7 1.2 Q50 -1.2 93 1.2 Q98.8 1.6 99 7 Q100.9 50 99 93 Q98.8 98.4 93 98.8 Q50 101.2 7 98.8 Q1.2 98.4 1 93 Q-0.9 50 1 7 Q1.2 1.6 7 1.2 Z' fill='black'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M7 1.2 Q50 -1.2 93 1.2 Q98.8 1.6 99 7 Q100.9 50 99 93 Q98.8 98.4 93 98.8 Q50 101.2 7 98.8 Q1.2 98.4 1 93 Q-0.9 50 1 7 Q1.2 1.6 7 1.2 Z' fill='black'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  box-shadow: inset 0 0 160px 40px rgba(0, 12, 0, 0.9), inset 0 0 24px 6px rgba(0, 8, 0, 0.9);
+}
+/* The glass: a soft reflection high on the left, and the edges darkening as they curve away. */
+#vignette {
+  background:
+    radial-gradient(ellipse 60% 40% at 28% 14%, rgba(220, 255, 220, 0.05), transparent 70%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 10, 0, 0.55) 88%, rgba(0, 4, 0, 0.9) 100%);
+}
+@media (max-width: 700px) {
+  #crt { inset: 6px; }
+}
+
+/* ---- The video overlay (Owner, 2026-10-01): PLAY at the top left; time and date at the bottom left -- */
+.osd { position: absolute; z-index: 6; pointer-events: none; display: none; font: bold calc(var(--font) * 0.78)/1.15 var(--mono); letter-spacing: 0.08em;
+  color: #e6ffe6; text-shadow: -1.5px 0 rgba(235, 255, 235, 0.5), 1.5px 0 rgba(var(--glow-rgb), 0.55), 0 0 6px rgba(var(--glow-rgb), 0.8); white-space: pre; }
+body.playing .osd { display: block; }
+body.menu-open .osd, body.booting .osd { display: none; }
+#osd-play { top: 20px; left: 34px; display: none; align-items: center; gap: 0.5ch; }
+body.playing:not(.menu-open):not(.booting):not(.terminated) #osd-play { display: flex; }
+#osd-play .pixel-glyph { width: 0.9em; height: 0.9em; }
+#osd-clock { bottom: 20px; left: 34px; }
+/* The connection timer moves out of the corner the overlay now holds. */
+#timer { left: auto; right: 44px; bottom: 14px; }
+@media (max-width: 700px) {
+  #osd-play { top: 10px; left: 16px; }
+  #osd-clock { bottom: 10px; left: 16px; font-size: calc(var(--font) * 0.6); }
+}
+
+/* ---- Menus: a retro terminal (Owner, 2026-10-01) ---------------------------------------------------
+   No boxes, no > < markers. Items are dim green text; the selected one is bright, with a line under
+   it and a blinking block cursor beside it. Every menu: main, pause, settings, confirmations, the
+   page arrows and back buttons, the Archive's tabs and actions. */
+.menu-item, .option {
+  position: relative; background: none; border: 0; border-radius: 0; box-shadow: none;
+  color: var(--dim); text-shadow: 0 0 1px currentColor, 0 0 4px rgba(var(--glow-rgb), 0.25);
+}
+.menu-item .marker, .menu-list .menu-item::after { display: none; content: none; }
+.menu-item .label { border-bottom: 2px solid transparent; padding-bottom: 0.08em; text-decoration: none; }
+.menu-item:focus, .menu-item:hover, .option:focus, .option:hover {
+  outline: none; background: none; color: color-mix(in srgb, var(--text) 45%, #fff); text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.9), 0 0 9px rgba(var(--glow-rgb), 0.85);
+}
+.menu-item:focus .label, .menu-item:hover .label { text-decoration: none; border-bottom-color: currentColor; box-shadow: 0 3px 6px -3px rgba(var(--glow-rgb), 0.9); }
+/* The blinking block cursor, to the left of the selected item. */
+.menu-item:focus::before, .option:focus::after {
+  content: "\2588"; position: absolute; left: -1.4ch; top: 50%; transform: translateY(-50%);
+  color: var(--text); text-shadow: var(--glow); animation: blink 1s steps(1) infinite;
+}
+.option:focus::after { left: -1.3ch; }
+:root[data-reduce-motion="on"] .menu-item:focus::before, :root[data-reduce-motion="on"] .option:focus::after { animation: none; }
+.menu-list .menu-item { min-width: 0; margin: 0.1em 0; padding: 0.15em 0.6ch; }
+.menu-item:disabled, .menu-item[aria-disabled="true"] { color: color-mix(in srgb, var(--dim) 55%, transparent); text-shadow: none; }
+/* A setting's chosen value: bright, in brackets, with its line; the rest dim. */
+.option[aria-pressed="true"] { color: color-mix(in srgb, var(--text) 45%, #fff); text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.9), 0 0 8px rgba(var(--glow-rgb), 0.7); border-bottom-color: currentColor; }
+.option:focus { outline: none; }
+/* The Archive's tabs: the open one bright and underlined. */
+.archive-tabs .archive-tab[aria-selected="true"] { color: color-mix(in srgb, var(--text) 45%, #fff); text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.9), 0 0 8px rgba(var(--glow-rgb), 0.7); }
+.archive-tabs .archive-tab[aria-selected="true"] .label { border-bottom-color: currentColor; }
+#confirm .menu-item { justify-content: flex-start; padding-left: 2ch; }
+#confirm .menu-item:focus::before { left: 0.2ch; }
+
+/* ---- PLAY and the time, inside the glass (Owner, 2026-10-01): larger, a softer green, and every
+   30–60 s a short glitch in the flicker's own language. ------------------------------------------ */
+.osd { font-size: calc(var(--font) * 1.05); color: color-mix(in srgb, var(--text) 70%, #021002); opacity: 0.78; letter-spacing: 0.1em;
+  text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.6), 0 0 10px rgba(var(--glow-rgb), 0.35); }
+#osd-play { top: 78px; left: 70px; }
+#osd-clock { bottom: 64px; left: 70px; }
+.osd.osd-glitch { animation: osd-glitch 0.75s steps(1) both; }
+@keyframes osd-glitch {
+  0% { opacity: 0.78; transform: none; clip-path: none; }
+  10% { opacity: 1; transform: translateX(-6px) skewX(-12deg); text-shadow: -4px 0 rgba(235, 255, 235, 0.85), 4px 0 rgba(var(--glow-rgb), 0.9); clip-path: inset(0 0 45% 0); }
+  22% { opacity: 0.2; transform: translateX(9px); clip-path: inset(40% 0 0 0); }
+  34% { opacity: 1; transform: translateX(-3px) scaleY(1.3); text-shadow: 3px 0 rgba(235, 255, 235, 0.9), -3px 0 rgba(var(--glow-rgb), 0.9); clip-path: inset(20% 0 30% 0); }
+  48% { opacity: 0; }
+  60% { opacity: 0.9; transform: translateX(5px) skewX(10deg); clip-path: inset(0 0 60% 0); }
+  74% { opacity: 0.5; transform: translateX(-2px); clip-path: none; }
+  86%, 100% { opacity: 0.78; transform: none; clip-path: none; }
+}
+:root[data-danger-effects="off"] .osd.osd-glitch, :root[data-reduce-motion="on"] .osd.osd-glitch { animation: none; }
+/* So does the opening's conversation. */
+body.opening #chat { inset: 108px 0 104px 0; padding: 3vh 12vw 1vh; }
+@media (max-width: 700px) { body.opening #chat { inset: 84px 0 64px 0; padding: 2vh 7vw 1vh; } }
+/* The command center's text keeps clear of PLAY and of the time: its area starts below one and ends
+   above the other, so scrolled lines never pass under them. */
+body.command #screen, body.command #pager { top: 108px; bottom: 104px; padding-top: 12px; padding-bottom: 12px; }
+body.song-on.command #screen { padding-top: 12px; }
+@media (max-width: 700px) {
+  #osd-play { top: 52px; left: 22px; }
+  #osd-clock { bottom: 22px; left: 22px; }
+  body.command #screen, body.command #pager { top: 38%; bottom: 56px; padding-top: 12px; padding-bottom: 12px; }
+  #pause-btn { top: 6px; left: 8px; }
+}
+
+/* ---- The glass of a CRT (Owner, 2026-10-01): soft glare along the top and sides, a thin dark fringe
+   following the curve of the glass, corners a little darker than the centre, and a faint diagonal
+   reflection across the top left. No frame, no casing. ------------------------------------------- */
+#glass {
+  position: absolute; inset: 0; z-index: 10; pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M7 1.2 Q50 -1.2 93 1.2 Q98.8 1.6 99 7 Q100.9 50 99 93 Q98.8 98.4 93 98.8 Q50 101.2 7 98.8 Q1.2 98.4 1 93 Q-0.9 50 1 7 Q1.2 1.6 7 1.2 Z' fill='none' stroke='black' stroke-opacity='0.55' stroke-width='22' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M7 1.2 Q50 -1.2 93 1.2 Q98.8 1.6 99 7 Q100.9 50 99 93 Q98.8 98.4 93 98.8 Q50 101.2 7 98.8 Q1.2 98.4 1 93 Q-0.9 50 1 7 Q1.2 1.6 7 1.2 Z' fill='none' stroke='black' stroke-opacity='0.9' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") center / 100% 100% no-repeat,
+    linear-gradient(118deg, rgba(235, 255, 235, 0.055) 0%, rgba(235, 255, 235, 0.03) 14%, transparent 26%),
+    linear-gradient(to bottom, rgba(225, 255, 225, 0.11), rgba(225, 255, 225, 0.03) 2.5%, transparent 6%),
+    linear-gradient(to right, rgba(225, 255, 225, 0.07), transparent 3.5%),
+    linear-gradient(to left, rgba(225, 255, 225, 0.07), transparent 3.5%),
+    radial-gradient(ellipse 75% 70% at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.32) 100%);
+}
+
+/* A numbered choice in John's panel (1. YES / 2. NO): two lines to press, or the keys 1 and 2. */
+.choice .choice-option { display: block; margin: 0.15em 0; padding: 0.1em 0.6ch; background: none; border: 0; font: inherit; text-align: left; color: var(--text); text-shadow: var(--glow); }
+.choice .choice-option:hover:not(:disabled), .choice .choice-option:focus-visible { outline: none; color: #e6ffe6; text-decoration: underline; text-underline-offset: 0.2em; }
+.choice .choice-option:disabled { color: var(--dim); cursor: var(--cur-arrow, default); }
+
+/* ---- Bare pixel signs (Owner, 2026-10-01, add-on): the game's pause, SKIP and the song's buttons are
+   just their pixel glyph, small, with a glow; no frame, no box. Pause sits top left inside the glass;
+   SKIP and the song's controls top right, so the two pauses never meet. ------------------------------ */
+.glyph-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; min-width: 40px; padding: 0;
+  background: none; border: 0; box-shadow: none; color: var(--text); text-shadow: none; cursor: var(--cur-hand, pointer);
+}
+.glyph-btn .pixel-glyph { width: 20px; height: 20px; filter: drop-shadow(0 0 3px rgba(var(--glow-rgb), 0.9)); }
+.glyph-btn:hover, .glyph-btn:focus-visible { outline: none; color: #e6ffe6; }
+.glyph-btn:hover .pixel-glyph, .glyph-btn:focus-visible .pixel-glyph { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px rgba(var(--glow-rgb), 1)); }
+#pause-btn { top: 42px; left: 64px; min-height: 0; padding: 0; gap: 0; background: none; border: 0; letter-spacing: 0; box-shadow: none; }
+#pause-btn .pixel-glyph { width: 18px; height: 18px; }
+#skip-btn { top: 42px; right: 64px; }
+#skip-btn .pixel-glyph { width: 24px; height: 24px; }
+/* First time: dim and not clickable; seen before: bright. */
+#skip-btn.locked { opacity: 0.32; filter: none; }
+#skip-btn.locked .pixel-glyph { filter: none; }
+/* The now-playing bar: no box; a faint line under it, the title, the waveform, the small signs. */
+#song-bar { top: 36px; right: 64px; height: 36px; background: none; border: 0; box-shadow: none; border-bottom: 1px solid rgba(var(--glow-rgb), 0.3); padding: 0 0.2ch 0 0.6ch; }
+#song-toggle .pixel-glyph, .song-skip .pixel-glyph { width: 16px; height: 16px; }
+#song-toggle, .song-skip { width: 30px; height: 30px; min-width: 30px; }
+/* PLAY and the time: larger, a semi-transparent white, a little further inside the glass. */
+.osd { color: rgba(255, 255, 255, 0.62); opacity: 1; font-size: calc(var(--font) * 1.3);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.35), 0 0 10px rgba(var(--glow-rgb), 0.25); }
+#osd-play { top: 88px; left: 84px; }
+#osd-clock { bottom: 72px; left: 84px; }
+#osd-play .pixel-glyph { filter: none; }
+body.command #screen, body.command #pager { top: 128px; bottom: 132px; }
+body.opening #chat { inset: 128px 0 132px 0; }
+@media (max-width: 700px) {
+  #pause-btn { top: 10px; left: 14px; }
+  #skip-btn { top: 10px; right: 14px; }
+  #osd-play { top: 52px; left: 22px; }
+  #osd-clock { bottom: 22px; left: 22px; }
+}
+
+/* ---- The fake terminal's bomb (Owner, 2026-10-01, rebuilt): green, white and black; only STATUS: FAILED is red. */
+#virus.trap .virus-box.tone-0 { background: #000; border-color: rgb(var(--glow-rgb)); box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.5); }
+#virus.trap .virus-box.tone-1 { background: rgb(var(--glow-rgb)); border-color: #000; }
+#virus.trap .virus-box.tone-2 { background: #e6ffe6; border-color: rgb(var(--glow-rgb)); }
+.taunt { position: absolute; z-index: 3; font-family: var(--mono); font-weight: bold; letter-spacing: 0.06em; white-space: nowrap; transform: rotate(var(--tilt, 0deg)); image-rendering: pixelated; }
+.taunt.tone-0 { color: rgb(var(--glow-rgb)); text-shadow: 0 0 8px rgba(var(--glow-rgb), 0.9); }
+.taunt.tone-1 { color: #fff; text-shadow: 0 0 8px rgba(255, 255, 255, 0.7), 3px 0 rgba(var(--glow-rgb), 0.8); }
+.taunt.tone-2 { color: #000; background: rgb(var(--glow-rgb)); padding: 0 0.3ch; }
+.taunt-dance { animation: taunt-dance 0.32s steps(2) infinite; }
+@keyframes taunt-dance { 0% { transform: rotate(var(--tilt, 0deg)) translate(0, 0); } 50% { transform: rotate(calc(var(--tilt, 0deg) * -1)) translate(2px, -3px); } }
+/* The symbols: one element each, any size; they flicker in, grow or shrink, and go. */
+.sym { position: absolute; z-index: 4; width: var(--size, 20vmin); color: rgb(var(--glow-rgb)); display: flex; flex-direction: column; align-items: center; gap: 0.06em;
+  font: bold calc(var(--size, 20vmin) * 0.16)/1.1 var(--mono); text-shadow: 0 0 6px rgba(var(--glow-rgb), 0.9); filter: drop-shadow(0 0 10px rgba(var(--glow-rgb), 0.7)); }
+.sym .sym-art { width: 100%; height: auto; color: inherit; }
+.sym-malware .sym-crab { width: 45%; }
+.sym-word { letter-spacing: 0.08em; }
+.sym-malware .sym-word { color: #fff; }
+.sym-danger { background: #000; border: calc(var(--size, 20vmin) * 0.03) solid rgb(var(--glow-rgb)); padding: calc(var(--size, 20vmin) * 0.05); box-sizing: border-box; }
+.sym-danger .sym-art { width: 62%; }
+.sym-stripes { width: 100%; height: calc(var(--size, 20vmin) * 0.08); background: repeating-linear-gradient(-45deg, rgb(var(--glow-rgb)) 0 calc(var(--size, 20vmin) * 0.04), #000 calc(var(--size, 20vmin) * 0.04) calc(var(--size, 20vmin) * 0.08)); }
+.sym-eye { color: #fff; filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6)); }
+.sym-skull, .sym-mask { color: #e6ffe6; }
+.sym-figure { width: calc(var(--size, 20vmin) * 0.5); }
+.sym-figure .frame-b { display: none; }
+.sym-figure:not(.sym-calm) .frame-a { animation: frame-a 0.36s steps(1) infinite; }
+.sym-figure:not(.sym-calm) .frame-b { display: block; position: absolute; inset: 0; animation: frame-b 0.36s steps(1) infinite; }
+@keyframes frame-a { 50% { visibility: hidden; } }
+@keyframes frame-b { 0% { visibility: hidden; } 50% { visibility: visible; } }
+.sym-bomb { width: calc(var(--size, 20vmin) * 0.6); }
+.sym-burst { position: absolute; inset: -40%; border-radius: 50%; background: radial-gradient(circle, #fff 0 12%, rgba(var(--glow-rgb), 0.9) 22%, rgba(var(--glow-rgb), 0.25) 48%, transparent 66%); transform: scale(0); animation: burst 0.9s ease-out 0.35s forwards; }
+@keyframes burst { 0% { transform: scale(0); opacity: 1; } 70% { transform: scale(1.1); opacity: 0.9; } 100% { transform: scale(1.4); opacity: 0; } }
+.sym-crash { width: calc(var(--size, 20vmin) * 1.6); align-items: flex-start; padding: calc(var(--size, 20vmin) * 0.08); box-sizing: border-box; background: #0a4a0a; color: #fff; text-shadow: none; filter: none; font-weight: normal; font-size: calc(var(--size, 20vmin) * 0.075); gap: 0.6em; }
+.sym-crash-face { font-size: 3.4em; line-height: 1; }
+.sym-crash-code { width: 3.2em; height: 3.2em; background: repeating-conic-gradient(#fff 0 25%, #0a4a0a 0 50%) 0 0 / 0.8em 0.8em; }
+.sym-grow { animation: sym-grow 1s ease-out both; }
+.sym-shrink { animation: sym-shrink 1s ease-in both; }
+.sym-flicker { animation: sym-flicker 0.9s steps(1) both; }
+.sym-pulse { animation: sym-pulse 0.8s ease-in-out infinite; }
+@keyframes sym-grow { 0% { transform: scale(0.2); opacity: 0; } 15% { opacity: 1; } 100% { transform: scale(1.35); opacity: 0.85; } }
+@keyframes sym-shrink { 0% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(0.3); opacity: 0; } }
+@keyframes sym-flicker { 0%, 30%, 55% { opacity: 1; } 20%, 45%, 70% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes sym-pulse { 0%, 100% { transform: scale(0.9); } 50% { transform: scale(1.15); } }
+/* The one message left: CONNECTION TERMINATED in white; STATUS: FAILED bright red and bold. */
+.trap-message { background: #000; border-color: rgb(var(--glow-rgb)); box-shadow: 0 0 0 4px #000, 0 0 40px rgba(var(--glow-rgb), 0.45); }
+.trap-message .headline { color: #fff; }
+.trap-message .failed { color: #ff2b2b; font-weight: bold; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(255, 43, 43, 0.6); }
+
+/* The choice in the dark (terminal menu, like every menu). */
+#death-choice { position: absolute; inset: 0; z-index: 12; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6em;
+  font: calc(var(--font) * 1.1)/1.5 var(--mono); background: #000; }
+#death-choice[hidden] { display: none; }
+#crt.blank > #death-choice:not([hidden]) { visibility: visible; }
+.menu-item.is-selected { color: color-mix(in srgb, var(--text) 45%, #fff); text-shadow: 0 0 2px rgba(var(--glow-rgb), 0.9), 0 0 9px rgba(var(--glow-rgb), 0.85); }
+.menu-item.is-selected .label { border-bottom-color: currentColor; box-shadow: 0 3px 6px -3px rgba(var(--glow-rgb), 0.9); }
+.menu-item.is-selected::before { content: "\2588"; position: absolute; left: -1.4ch; top: 50%; transform: translateY(-50%); color: var(--text); text-shadow: var(--glow); animation: blink 1s steps(1) infinite; }
+:root[data-reduce-motion="on"] .menu-item.is-selected::before { animation: none; }
+
+/* Phones: John on top, the command center below (after the desktop bounds above). */
+@media (max-width: 700px) {
+  body.command #screen, body.command #pager { top: 38%; bottom: 56px; }
+  body.opening #chat { inset: 84px 0 64px 0; }
+}
+
+/* PLAY and the time at 25% (Owner, 2026-10-01): subtle; every 15–20 s a 1.5 s glitch, then back to 25%. */
+.osd { color: #fff; opacity: 0.25; }
+.osd.osd-glitch { animation: osd-glitch-long 1.5s steps(1) both; }
+@keyframes osd-glitch-long {
+  0% { opacity: 0.25; transform: none; clip-path: none; }
+  6% { opacity: 0.85; transform: translateX(-7px) skewX(-14deg); text-shadow: -4px 0 rgba(235, 255, 235, 0.9), 4px 0 rgba(var(--glow-rgb), 0.9); clip-path: inset(0 0 45% 0); }
+  14% { opacity: 0.05; transform: translateX(10px); clip-path: inset(40% 0 0 0); }
+  22% { opacity: 0.9; transform: translateX(-3px) scaleY(1.35); text-shadow: 3px 0 rgba(235, 255, 235, 0.9), -3px 0 rgba(var(--glow-rgb), 0.9); clip-path: inset(20% 0 30% 0); }
+  31% { opacity: 0; }
+  40% { opacity: 0.7; transform: translateX(6px) skewX(12deg); clip-path: inset(0 0 60% 0); }
+  52% { opacity: 0.15; transform: translateX(-9px); clip-path: inset(55% 0 0 0); }
+  63% { opacity: 0.8; transform: scaleX(1.12); text-shadow: 6px 0 rgba(var(--glow-rgb), 0.8); clip-path: none; }
+  74% { opacity: 0.1; transform: translateX(2px); }
+  86% { opacity: 0.45; transform: none; }
+  100% { opacity: 0.25; transform: none; clip-path: none; }
+}
+:root[data-danger-effects="off"] .osd.osd-glitch, :root[data-reduce-motion="on"] .osd.osd-glitch { animation: none; }
+
+/* The death choice (Owner, 2026-10-01): retro pixel-art buttons, green; selected bright, the other dim. */
+#death-choice .death-option { min-width: 22ch; justify-content: center; font: bold calc(var(--font) * 0.95) var(--mono); opacity: 0.45; }
+#death-choice .death-option.is-selected { opacity: 1; --pi: color-mix(in srgb, rgb(var(--glow-rgb)) 55%, #021002); --pl: color-mix(in srgb, rgb(var(--glow-rgb)) 90%, #fff); color: #fff; }
+#death-choice .death-option::before { content: none !important; }
+
+/* The connection timer (Final.md, THE 10-MINUTE TIMER, Parts 3 and 10): small, dim (about 40%), a slight glow.
+   Top centre (Owner, 2026-10-06): [PAUSE] left, [TIMER] centre, [SONG BAR] right, on one row. The colon blinks
+   every second. 10:00–7:00 green; 7:00–4:00 a little brighter; 4:00–1:00 amber; 1:00–0:00 bright red, blinking. */
+#timer { color: var(--text); opacity: 0.4; font-weight: normal; text-shadow: 0 0 4px rgba(var(--glow-rgb), 0.6); }
+#timer { top: 46px; left: 50%; right: auto; bottom: auto; transform: translateX(-50%); }
+@media (min-width: 701px) {
+  body.command #chat { top: 78px; }
+  body.song-on.command #chat { top: 108px; }
+}
+@media (max-width: 700px) {
+  /* Phones: between John's panel and the command center, as before; centred. */
+  #timer { top: calc(38% - 4px); }
+}
+/* "Signal disturbance detected." sits below the timer, never on it. */
+#disturbance { top: 78px; }
+#timer.blink .colon { visibility: hidden; }
+#timer[data-band="bright"] { opacity: 0.62; }
+#timer[data-band="amber"] { color: #ffb000; opacity: 0.8; text-shadow: 0 0 6px rgba(255, 176, 0, 0.55); }
+#timer[data-band="red"] { color: #ff3b3b; opacity: 1; font-weight: bold; text-shadow: 0 0 8px rgba(255, 40, 40, 0.8); animation: timer-red 1s steps(1) infinite; }
+@keyframes timer-red { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { #timer[data-band="red"] { animation: none; } }
+
+/* Command colour (Final.md, THE AMBER SETTING; rule changed by the Owner, 2026-10-06): in amber mode the commands
+   John gives in his chat are P3 amber, #FFB000, so the player sees what to type; what the player types in the
+   command center keeps the standard colour, and so does everything else. The player's chat is white. */
+:root[data-command-color="amber"] #chat-log .cmd { color: #ffb000; text-shadow: 0 0 1px currentColor, 0 0 6px rgba(255, 176, 0, 0.35); }
+:root[data-command-color="amber"] #chat-log .caine,
+:root[data-command-color="amber"] #chat-typed,
+:root[data-command-color="amber"] #chat-after { color: #ffffff; }
+
+/* ---- Fixed components (Owner, 2026-10-06): the glass is a fixed viewport. Pause, PLAY, the timer, the song
+   bar, the time and date, SKIP and the edges of the command center and John's panel are placed in units of
+   the glass itself (--px: one pixel of a 1920 × 1080 screen), so zooming or resizing the browser never moves
+   them on the glass or pushes them past its curved edge. The text inside keeps its own size (Settings > Text
+   size) and scrolls inside its area. Phones keep their own layout. */
+@media (min-width: 701px) {
+  :root { --px: calc(min(100vw, 177.78vh) / 1920); }
+  #pause-btn { top: calc(42 * var(--px)); left: calc(64 * var(--px)); }
+  #skip-btn { top: calc(42 * var(--px)); right: calc(64 * var(--px)); }
+  #pause-btn, #skip-btn { width: calc(40 * var(--px)); height: calc(40 * var(--px)); min-width: calc(40 * var(--px)); }
+  #pause-btn .pixel-glyph { width: calc(18 * var(--px)); height: calc(18 * var(--px)); }
+  #skip-btn .pixel-glyph { width: calc(24 * var(--px)); height: calc(24 * var(--px)); }
+  .osd { font-size: calc(28.6 * var(--px)); }
+  #osd-play { top: calc(88 * var(--px)); left: calc(84 * var(--px)); }
+  #osd-clock { bottom: calc(72 * var(--px)); left: calc(84 * var(--px)); }
+  #timer { top: calc(46 * var(--px)); }
+  #disturbance { top: calc(78 * var(--px)); }
+  #song-bar { top: calc(36 * var(--px)); right: calc(64 * var(--px)); height: calc(36 * var(--px)); font-size: calc(17.6 * var(--px)); }
+  #song-beat { height: calc(30 * var(--px)); gap: calc(2 * var(--px)); }
+  #song-beat i { width: calc(4 * var(--px)); }
+  #song-toggle, .song-skip { width: calc(30 * var(--px)); height: calc(30 * var(--px)); min-width: calc(30 * var(--px)); }
+  #song-toggle .pixel-glyph, .song-skip .pixel-glyph { width: calc(16 * var(--px)); height: calc(16 * var(--px)); }
+  body.command #screen, body.command #pager { top: calc(128 * var(--px)); bottom: calc(132 * var(--px)); padding-left: calc(68 * var(--px)); padding-right: calc(68 * var(--px)); }
+  body.opening #chat { inset: calc(128 * var(--px)) 0 calc(132 * var(--px)) 0; }
+  body.command #chat { top: calc(78 * var(--px)); right: calc(44 * var(--px)); bottom: calc(44 * var(--px)); }
+  body.song-on.command #chat { top: calc(108 * var(--px)); }
+}
+/* The Archive's song bar sits in its panel, not on the glass. */
+.archive-right > #song-bar:not([hidden]) { height: 36px; font-size: calc(var(--font) * 0.8); }
+
+/* Death (Owner, 2026-10-06): the frozen second, and TRY AGAIN under the boot. */
+body.frozen #crt > :not(#virus):not(#death-choice), body.frozen #crt > :not(#virus):not(#death-choice) *,
+body.frozen #crt > :not(#virus):not(#death-choice) *::before, body.frozen #crt > :not(#virus):not(#death-choice) *::after { animation-play-state: paused !important; }
+#death-choice.chosen { pointer-events: none; }
+body.reboot #boot { z-index: 13; }
+body.reboot #flash { z-index: 14; }
+
+/* The timer (Owner, 2026-10-06): the size of the rest of the text; a second of bright red at 7:00, 5:00, 3:00, 1:00 and 0:30. */
+#timer { font-size: var(--font); }
+#timer.flash, #timer.flash[data-band] { color: #ff3b3b; opacity: 1; font-weight: bold; text-shadow: 0 0 6px rgba(255, 40, 40, 0.95), 0 0 16px rgba(255, 40, 40, 0.7); animation: none; }
+#timer.flash .colon { visibility: visible; }

@@ -12,6 +12,10 @@ A browser-based psychological mystery created and developed by **[Uttam Torry](h
 
 ---
 
+![PROJECT C.A.I.N.E. main menu on a glowing green CRT screen](docs/screenshots/01-main-menu.png)
+
+*An old screen. A new connection.*
+
 ## Enter the archive
 
 Caine is at his computer when a stranger named John begins speaking through the screen. John teaches him how to navigate an archive. Inside are photographs, handwritten notes, documents and songs that make the search increasingly personal.
@@ -42,6 +46,40 @@ This repository is the public showcase and information hub. Cloning it does not 
 - **Step into the CRT glow.** Phosphor text, scanlines, curved glass, mechanical keystrokes and signal disturbances shape the atmosphere.
 
 The game is designed around 1990s computer nostalgia, family records and a growing sense of unease. This page deliberately avoids puzzle solutions and story revelations.
+
+## Inside the game
+
+Screenshots from the current development build.
+
+### First contact
+
+![The opening message, Wake up Caine, on the CRT screen](docs/screenshots/02-first-contact.png)
+
+*A few words break the silence.*
+
+### Finding your way
+
+![The command terminal beside John's navigation tutorial](docs/screenshots/03-terminal-exploration.png)
+
+*A directory, a prompt, and someone willing to guide you.*
+
+### Traces of home
+
+![An aged family Christmas photograph open in the image viewer](docs/screenshots/04-photo-viewer.png)
+
+*Ordinary memories invite a closer look.*
+
+### What you keep
+
+![Level 1 discoveries arranged in the archive's image grid](docs/screenshots/05-discovery-archive.png)
+
+*Return to the things you found. Some details take a second look.*
+
+### Your view of the screen
+
+![Display settings with the soft blue palette selected](docs/screenshots/06-display-settings.png)
+
+*Adjust the glow, the text and the curve of the glass.*
 
 ## Getting started
 
@@ -129,7 +167,7 @@ If you want to follow development, star or watch this repository for updates.
 
 The original documentation and any code explicitly published in this showcase repository are licensed under the [MIT License](LICENSE). Preserve the copyright and licence notice when reusing MIT-covered material.
 
-This licence does not cover the private game source, game narrative, artwork, photographs, music, recordings or branding. Those materials are not being released under MIT by this showcase.
+This licence does not cover the private game source, game narrative, artwork, photographs, music, recordings or branding. Those materials, including the gameplay screenshots in `docs/screenshots/`, are not being released under MIT by this showcase.
 
 The game, its narrative and original assets remain protected by their applicable rights. Third-party material, if included, retains its own terms.
 

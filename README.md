@@ -8,6 +8,10 @@ A browser-based psychological mystery created and developed by **[Uttam Torry](h
 
 **Interactive fiction · Terminal exploration · Environmental storytelling**
 
+### [▶ Play First Contact](https://sarva-uttam.github.io/Project-C.A.I.N.E/)
+
+*Temporary GitHub Pages address · Official domain coming soon*
+
 </div>
 
 ---
@@ -26,15 +30,15 @@ PROJECT C.A.I.N.E. turns an old computer into the setting for a mystery. Its sto
 
 ## Play and availability
 
-**Public browser access: coming soon.**
+**Play now:** [PROJECT C.A.I.N.E. — First Contact](https://sarva-uttam.github.io/Project-C.A.I.N.E/)
 
-Level 1, **First Contact**, is implemented in the development build. The wider campaign remains in development.
+This is the temporary GitHub Pages home of the game. **Level 1 — First Contact** is playable; the wider campaign remains in development. Levels 2–100 are not yet playable.
 
-The public play link will appear here once the hosted build is verified. The game is intended to be served through GitHub Pages while its development repository remains private.
+The hosted build is published from this public repository. The development source and internal story records remain in a separate private repository.
 
 **An official domain is coming soon.** Its address will be announced here when ready. No release date is announced yet.
 
-This repository is the public showcase and information hub. Cloning it does not install the game or provide its private source code.
+This repository contains the public showcase and the published browser build under `site/`. Play through the link above; the private TypeScript development source is maintained separately.
 
 ## The experience
 
@@ -83,7 +87,7 @@ Screenshots from the current development build.
 
 ## Getting started
 
-When browser access opens, launch the game and choose **New Game**. The opening introduces the terminal and its controls; prior command-line experience is not required.
+[Launch the game](https://sarva-uttam.github.io/Project-C.A.I.N.E/) and choose **New Game**. The opening introduces the terminal and its controls; prior command-line experience is not required.
 
 | Action | Control |
 | --- | --- |
@@ -101,7 +105,7 @@ The terminal is simulated. Its commands operate on the game's fictional files, n
 
 The game is built for modern desktop and mobile browsers. A desktop or laptop with a keyboard is recommended for the terminal experience. Compatibility testing is ongoing.
 
-The browser version requires no native installation or player account. Sound adds atmosphere, and audio controls are available in Settings.
+The browser version requires no native installation or player account. Sound adds atmosphere, and audio controls are available in Settings. Audio starts after your first click or key press, in accordance with browser autoplay restrictions.
 
 Display and accessibility options include:
 
@@ -143,9 +147,11 @@ The source, internal design documents and unreleased story content are maintaine
 
 ## Development status
 
-**Available in the development build:** Level 1 — First Contact, terminal exploration, John's dialogue, local saves, media discovery, an archive and presentation settings.
+**Available in the live build:** Level 1 — First Contact, terminal exploration, John's dialogue, local saves, media discovery, an archive and presentation settings.
 
-**In progress:** public hosting verification, continued playtesting and refinement.
+**In progress:** continued playtesting and refinement.
+
+The live site is a published copy. Changes to the private development repository appear online only after a new build is copied into `site/` here and pushed.
 
 **Planned:** an official domain and further campaign development. Later levels are not being presented as completed content.
 
@@ -165,9 +171,9 @@ If you want to follow development, star or watch this repository for updates.
 
 ## Rights and support
 
-The original documentation and any code explicitly published in this showcase repository are licensed under the [MIT License](LICENSE). Preserve the copyright and licence notice when reusing MIT-covered material.
+The original showcase documentation and any code explicitly released under MIT are licensed under the [MIT License](LICENSE). Preserve the copyright and licence notice when reusing MIT-covered material.
 
-This licence does not cover the private game source, game narrative, artwork, photographs, music, recordings or branding. Those materials, including the gameplay screenshots in `docs/screenshots/`, are not being released under MIT by this showcase.
+The published game build in `site/` is provided for browser play and is not released under MIT. This licence does not cover the private game source, game narrative, artwork, photographs, music, recordings or branding. Those materials, including the gameplay screenshots in `docs/screenshots/`, are not being released under MIT by this showcase.
 
 The game, its narrative and original assets remain protected by their applicable rights. Third-party material, if included, retains its own terms.
 
